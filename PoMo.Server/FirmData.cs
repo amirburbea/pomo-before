@@ -27,12 +27,13 @@ namespace PoMo.Server
 
     internal sealed class FirmData : IFirmData, IDisposable
     {
-        private readonly Dictionary<string, DataTable> _dataTables = new Dictionary<string, DataTable>();
         private readonly IMarketDataProvider _marketDataProvider;
         private readonly PortfolioDataCollection _portfolios = new PortfolioDataCollection();
         private readonly List<RowChangeBase> _rowChanges = new List<RowChangeBase>();
         private readonly HashSet<string> _subscribers = new HashSet<string>();
         private readonly DataTable _summary;
+        private readonly string[] _tickers;
+        private readonly Dictionary<string, decimal[]> _pnls = new Dictionary<string, decimal[]>();
         private readonly Timer _timer;
         private readonly ITradeFactory _tradeFactory;
 
@@ -51,16 +52,29 @@ namespace PoMo.Server
                 }
             };
             this._summary.PrimaryKey = new[] { this._summary.Columns[0] };
+            this._tickers = dataContext.Securities.Select(security => security.Ticker).OrderBy(ticker => ticker).ToArray();
             foreach (Portfolio portfolio in dataContext.Portfolios.OrderBy(portfolio => portfolio.Id))
             {
                 PortfolioData portfolioData = new PortfolioData(portfolio, dataContext);
+                decimal portfolioPnl = 0m;
+                decimal[] pnl = new decimal[this._tickers.Length];
                 DataTable dataTable = portfolioData.GetData();
+                for (int index = 0; index < this._tickers.Length; index++)
+                {
+                    string ticker = this._tickers[index];
+                    DataRow dataRow = dataTable.Rows.Find(ticker);
+                    if (dataRow == null)
+                    {
+                        continue;
+                    }
+                    portfolioPnl += (pnl[index] = dataRow.Field<decimal>("Pnl"));
+                }
                 DataRow summaryRow = this._summary.NewRow();
                 summaryRow.SetField("PortfolioId", portfolio.Id);
                 summaryRow.SetField("PortfolioName", portfolio.Name);
-                summaryRow.SetField("Pnl", dataTable.Rows.Cast<DataRow>().Sum(dataRow => dataRow.Field<decimal>("Pnl")));
+                summaryRow.SetField("Pnl", portfolioPnl);
                 this._summary.Rows.Add(summaryRow);
-                this._dataTables.Add(portfolio.Id, dataTable);
+                this._pnls.Add(portfolio.Id, pnl);
                 portfolioData.DataChanged += this.PortfolioData_DataChanged;
                 this._portfolios.Add(portfolioData);
             }
@@ -146,44 +160,44 @@ namespace PoMo.Server
         private void PortfolioData_DataChanged(object sender, DataEventArgs<RowChangeBase[]> e)
         {
             PortfolioData portfolioData = (PortfolioData)sender;
-            decimal pnl;
+            decimal portfolioPnl;
             lock (this._summary)
             {
-                DataTable dataTable = this._dataTables[portfolioData.PortfolioId];
+                decimal[] pnl = this._pnls[portfolioData.PortfolioId];
                 DataRow summaryRow = this._summary.Rows.Find(portfolioData.PortfolioId);
-                pnl = summaryRow.Field<decimal>("Pnl");
+                portfolioPnl = summaryRow.Field<decimal>("Pnl");
                 foreach (RowChangeBase rowChange in e.Data)
                 {
+                    string ticker = (string)rowChange.RowKey;
+                    int index = Array.BinarySearch(this._tickers, ticker);
                     if (rowChange.ChangeType == RowChangeType.Added)
                     {
-                        DataRow dataRow = dataTable.Rows.Add(((RowAdded)rowChange).Data);
-                        pnl += dataRow.Field<decimal>("Pnl");
+                        decimal rowPnl = (decimal)((RowAdded)rowChange).Data[PositionData.SchemaTable.Columns.IndexOf("Pnl")];
+                        portfolioPnl += (pnl[index] = rowPnl);
                     }
                     else
                     {
-                        DataRow dataRow = dataTable.Rows.Find(rowChange.RowKey);
-                        decimal rowPnl = dataRow.Field<decimal>("Pnl");
+                        decimal currentRowPnl = pnl[index];
                         switch (rowChange.ChangeType)
                         {
                             case RowChangeType.Removed:
-                                pnl -= rowPnl;
-                                dataTable.Rows.Remove(dataRow);
+                                portfolioPnl -= currentRowPnl;
+                                pnl[index] = 0m;
                                 break;
                             case RowChangeType.ColumnsChanged:
-                                foreach (ColumnChange columnChange in ((RowColumnsChanged)rowChange).ColumnChanges)
+                                ColumnChange columnChange = ((RowColumnsChanged)rowChange).ColumnChanges.FirstOrDefault(change => change.ColumnName == "Pnl");
+                                if (columnChange == null)
                                 {
-                                    if (columnChange.ColumnName == "Pnl")
-                                    {
-                                        pnl += (decimal)columnChange.Value - rowPnl;
-                                    }
-                                    dataRow[columnChange.ColumnName] = columnChange.Value;
+                                    continue;
                                 }
+                                decimal newRowPnl = (decimal)columnChange.Value;
+                                pnl[index] = newRowPnl;
+                                portfolioPnl += newRowPnl - currentRowPnl;
                                 break;
                         }
                     }
                 }
-                dataTable.AcceptChanges();
-                summaryRow.SetField("Pnl", pnl);
+                summaryRow.SetField("Pnl", portfolioPnl);
                 summaryRow.AcceptChanges();
             }
             lock (this._rowChanges)
@@ -199,7 +213,7 @@ namespace PoMo.Server
                             new ColumnChange
                             {
                                 ColumnName = "Pnl",
-                                Value = pnl
+                                Value = portfolioPnl
                             }
                         }
                     });
@@ -207,7 +221,7 @@ namespace PoMo.Server
                 else
                 {
                     RowColumnsChanged rowChange = (RowColumnsChanged)this._rowChanges[index];
-                    rowChange.ColumnChanges[0].Value = pnl;
+                    rowChange.ColumnChanges[0].Value = portfolioPnl;
                 }
             }
         }

@@ -31,13 +31,6 @@ namespace PoMo.Server
 
     internal sealed class PortfolioData : IPortfolioData
     {
-        private static readonly DataTable _dataSchemaTable = PortfolioData.CreateDataSchemaTable();
-
-        private static readonly string[] _propertyNames = typeof(Position).GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(property => property.GetMethod.GetParameters().Length == 0)
-            .Select(property => property.Name)
-            .ToArray();
-
         private readonly DataTable _dataTable;
         private readonly Portfolio _portfolio;
         private readonly List<Position> _positions;
@@ -46,7 +39,7 @@ namespace PoMo.Server
         public PortfolioData(Portfolio portfolio, IDataContext dataContext)
         {
             this._portfolio = portfolio;
-            this._dataTable = PortfolioData._dataSchemaTable.Clone();
+            this._dataTable = PositionData.SchemaTable.Clone();
             this._dataTable.TableName = portfolio.Id;
             this._subscribers = new HashSet<string>();
             this._positions = new List<Position>();
@@ -205,9 +198,9 @@ namespace PoMo.Server
         private DataRow CreateRow(Position position)
         {
             DataRow dataRow = this._dataTable.NewRow();
-            foreach (string propertyName in PortfolioData._propertyNames)
+            foreach (PropertyInfo property in PositionData.Properties)
             {
-                dataRow[propertyName] = position[propertyName];
+                dataRow[property.Name] = position[property.Name];
             }
             return dataRow;
         }

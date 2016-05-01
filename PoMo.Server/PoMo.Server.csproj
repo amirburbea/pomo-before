@@ -82,6 +82,7 @@
     <Compile Include="ISubscribable.cs" />
     <Compile Include="MarketDataProvider.cs" />
     <Compile Include="Position.cs" />
+    <Compile Include="PositionData.cs" />
     <Compile Include="PriceChange.cs" />
     <Compile Include="RandomMethods.cs" />
     <Compile Include="TradeFactory.cs" />
