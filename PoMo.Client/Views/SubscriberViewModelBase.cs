@@ -127,12 +127,12 @@ namespace PoMo.Client.Views
                     {
                         foreach (ColumnChange columnChange in ((RowColumnsChanged)rowChange).ColumnChanges)
                         {
-                            if (columnChange.ColumnName == "Pnl")
+                            if (columnChange.ColumnOrdinal == this._dataTable.Columns.IndexOf("Pnl"))
                             {
                                 // Delta in Pnl
                                 pnl += (decimal)columnChange.Value - rowPnl;
                             }
-                            dataRow[columnChange.ColumnName] = columnChange.Value;
+                            dataRow[columnChange.ColumnOrdinal] = columnChange.Value;
                         }
                     }
                 }

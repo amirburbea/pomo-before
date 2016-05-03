@@ -1,17 +1,35 @@
-﻿namespace PoMo.Common.DataObjects
+﻿using System;
+
+namespace PoMo.Common.DataObjects
 {
+    [Serializable]
     public sealed class ColumnChange
     {
-        public string ColumnName
+        private int _columnOrdinal;
+        private object _value;
+
+        public int ColumnOrdinal
         {
-            get;
-            set;
+            get
+            {
+                return this._columnOrdinal;
+            }
+            set
+            {
+                this._columnOrdinal = value;
+            }
         }
 
         public object Value
         {
-            get;
-            set;
+            get
+            {
+                return this._value;
+            }
+            set
+            {
+                this._value = value;
+            }
         }
     }
 }

@@ -243,9 +243,10 @@ namespace PoMo.Server
                 {
                     rowChange = this._rowChanges[index];
                 }
-                if ((index = rowChange.ColumnChanges.BinarySearchByValue(e.PropertyName, columnChange => columnChange.ColumnName)) < 0)
+                int columnOrdinal = PositionData.SchemaTable.Columns.IndexOf(e.PropertyName);
+                if ((index = rowChange.ColumnChanges.BinarySearchByValue(columnOrdinal, columnChange => columnChange.ColumnOrdinal)) < 0)
                 {
-                    rowChange.ColumnChanges.Insert(~index, new ColumnChange { ColumnName = e.PropertyName, Value = newValue });
+                    rowChange.ColumnChanges.Insert(~index, new ColumnChange { ColumnOrdinal = columnOrdinal, Value = newValue });
                 }
                 else
                 {

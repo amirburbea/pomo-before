@@ -185,7 +185,7 @@ namespace PoMo.Server
                                 pnl[index] = 0m;
                                 break;
                             case RowChangeType.ColumnsChanged:
-                                ColumnChange columnChange = ((RowColumnsChanged)rowChange).ColumnChanges.FirstOrDefault(change => change.ColumnName == "Pnl");
+                                ColumnChange columnChange = ((RowColumnsChanged)rowChange).ColumnChanges.FirstOrDefault(change => PositionData.SchemaTable.Columns[change.ColumnOrdinal].ColumnName == "Pnl");
                                 if (columnChange == null)
                                 {
                                     continue;
@@ -212,7 +212,7 @@ namespace PoMo.Server
                         {
                             new ColumnChange
                             {
-                                ColumnName = "Pnl",
+                                ColumnOrdinal = this._summary.Columns.IndexOf("Pnl"),
                                 Value = portfolioPnl
                             }
                         }
