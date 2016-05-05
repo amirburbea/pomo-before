@@ -166,13 +166,14 @@ namespace PoMo.Server
                 decimal[] pnl = this._pnls[portfolioData.PortfolioId];
                 DataRow summaryRow = this._summary.Rows.Find(portfolioData.PortfolioId);
                 portfolioPnl = summaryRow.Field<decimal>("Pnl");
+                int portfolioDataPnlOrdinal = PositionData.SchemaTable.Columns.IndexOf("Pnl");
                 foreach (RowChangeBase rowChange in e.Data)
                 {
                     string ticker = (string)rowChange.RowKey;
                     int index = Array.BinarySearch(this._tickers, ticker);
                     if (rowChange.ChangeType == RowChangeType.Added)
                     {
-                        decimal rowPnl = (decimal)((RowAdded)rowChange).Data[PositionData.SchemaTable.Columns.IndexOf("Pnl")];
+                        decimal rowPnl = (decimal)((RowAdded)rowChange).Data[portfolioDataPnlOrdinal];
                         portfolioPnl += (pnl[index] = rowPnl);
                     }
                     else
@@ -185,7 +186,7 @@ namespace PoMo.Server
                                 pnl[index] = 0m;
                                 break;
                             case RowChangeType.ColumnsChanged:
-                                ColumnChange columnChange = ((RowColumnsChanged)rowChange).ColumnChanges.FirstOrDefault(change => PositionData.SchemaTable.Columns[change.ColumnOrdinal].ColumnName == "Pnl");
+                                ColumnChange columnChange = ((RowColumnsChanged)rowChange).ColumnChanges.FirstOrDefault(change => change.ColumnOrdinal == portfolioDataPnlOrdinal);
                                 if (columnChange == null)
                                 {
                                     continue;
