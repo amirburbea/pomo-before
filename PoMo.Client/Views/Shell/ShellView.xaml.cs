@@ -55,12 +55,12 @@ namespace PoMo.Client.Views.Shell
             this.Loaded += this.ShellView_Loaded;
         }
 
-        internal ShellViewModel ViewModel => this.DataContext as ShellViewModel;
-
         public ITabTearOffHandler TabTearOffHandler
         {
             get;
         }
+
+        internal ShellViewModel ViewModel => this.DataContext as ShellViewModel;
 
         internal IDisposable CreateIgnoreSelectionChangedScope()
         {
@@ -195,6 +195,21 @@ namespace PoMo.Client.Views.Shell
             {
                 this.CreateFirmSummaryTab();
             }
+        }
+
+        private void TabControl_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton != MouseButton.Middle)
+            {
+                return;
+            }
+            DependencyObject tabItem = (e.OriginalSource as DependencyObject)?.FindVisualTreeAncestor(typeof(TabItem));
+            if (tabItem == null)
+            {
+                return;
+            }
+            ShellView.CloseTabCommand.Execute(tabItem, null);
+            e.Handled = true;
         }
 
         private void TabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
