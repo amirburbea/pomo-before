@@ -27,15 +27,14 @@ namespace PoMo.Client.Views
             return this._collection.Properties.Find(columnName, false)?.GetValue(this);
         }
 
-        internal bool OnPropertyChanged(int ordinal, object value)
+        internal void OnPropertyChanged(int ordinal, object value)
         {
             if (object.Equals(this._values[ordinal], value))
             {
-                return false;
+                return;
             }
             this._values[ordinal] = value;
             this.OnPropertyChanged(this._collection.Properties[ordinal].Name);
-            return true;
         }
 
         private void OnPropertyChanged(string propertyName)

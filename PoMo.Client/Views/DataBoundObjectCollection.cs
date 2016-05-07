@@ -33,7 +33,6 @@ namespace PoMo.Client.Views
                 this.Add(new DataBoundObject(this, row.ItemArray));
                 this._rowIndices.Add(row, this._rowIndices.Count);
             }
-            this.RaisesItemChangedEvents = true;
             this.CustomTypeDescriptor = new DataBoundTypeDescriptor(this.Properties);
             this._dataTable.RowChanged += this.DataTable_RowChanged;
             this._dataTable.TableCleared += this.DataTable_TableCleared;
@@ -71,11 +70,7 @@ namespace PoMo.Client.Views
             get;
         }
 
-        public bool RaisesItemChangedEvents
-        {
-            get;
-            set;
-        }
+        bool IRaiseItemChangedEvents.RaisesItemChangedEvents => false;
 
         public void Dispose()
         {
@@ -129,11 +124,9 @@ namespace PoMo.Client.Views
         private void DataTable_ColumnChanged(object sender, DataColumnChangeEventArgs e)
         {
             int rowIndex;
-            if (this._rowIndices.TryGetValue(e.Row, out rowIndex) &&
-                this[rowIndex].OnPropertyChanged(e.Column.Ordinal, e.ProposedValue) &&
-                this.RaisesItemChangedEvents)
+            if (this._rowIndices.TryGetValue(e.Row, out rowIndex))
             {
-                this.OnListChanged(ListChangedType.ItemChanged, rowIndex, this.Properties[e.Column.Ordinal]);
+                this[rowIndex].OnPropertyChanged(e.Column.Ordinal, e.ProposedValue);
             }
         }
 
@@ -187,9 +180,9 @@ namespace PoMo.Client.Views
             this.OnListChanged(ListChangedType.Reset, -1);
         }
 
-        private void OnListChanged(ListChangedType listChangedType, int rowIndex, PropertyDescriptor propertyDescriptor = null)
+        private void OnListChanged(ListChangedType listChangedType, int rowIndex)
         {
-            this.ListChanged?.Invoke(this, new ListChangedEventArgs(listChangedType, rowIndex, propertyDescriptor));
+            this.ListChanged?.Invoke(this, new ListChangedEventArgs(listChangedType, rowIndex));
         }
 
         private sealed class ColumnPropertyDescriptor : PropertyDescriptor
