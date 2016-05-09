@@ -58,7 +58,7 @@ namespace PoMo.Client.Views
                 }
                 else
                 {
-                    this.UnsubscribeAsync();
+                    this.UnsubscribeProjection(this.CreateBusyScope());
                     this._dataTable = null;
                     this.Data = null;
                 }
@@ -75,6 +75,16 @@ namespace PoMo.Client.Views
             {
                 this.SetValue(ref this._pnl, value);
             }
+        }
+
+        protected abstract Func<IDisposable, Task<DataTable>> SubscribeProjection
+        {
+            get;
+        }
+
+        protected abstract Func<IDisposable, Task> UnsubscribeProjection
+        {
+            get;
         }
 
         public override void Dispose()
@@ -110,7 +120,21 @@ namespace PoMo.Client.Views
                 if (rowChange.ChangeType == RowChangeType.Added)
                 {
                     DataRow dataRow = this._dataTable.NewRow();
-                    dataRow.ItemArray = ((RowAdded)rowChange).Data;
+                    RowAdded rowAdded = (RowAdded)rowChange;
+                    for (int index = 0; index < rowAdded.Data.Length; index++)
+                    {
+                        object value = rowAdded.Data[index];
+                        if (value == null || value == DBNull.Value)
+                        {
+                            continue;
+                        }
+                        DataColumn column = this._dataTable.Columns[index];
+                        if (!column.DataType.IsInstanceOfType(value))
+                        {
+                            rowAdded.Data[index] = Convert.ChangeType(value, column.DataType);
+                        }
+                    }
+                    dataRow.ItemArray = rowAdded.Data;
                     this._dataTable.Rows.InsertAt(dataRow, ~wrapper.BinarySearchByValue((string)rowChange.RowKey, row => row.Field<string>("Ticker")));
                     pnl += dataRow.Field<decimal>("Pnl");
                 }
@@ -127,12 +151,20 @@ namespace PoMo.Client.Views
                     {
                         foreach (ColumnChange columnChange in ((RowColumnsChanged)rowChange).ColumnChanges)
                         {
-                            if (columnChange.ColumnOrdinal == this._dataTable.Columns.IndexOf("Pnl"))
+                            DataColumn column = this._dataTable.Columns[columnChange.ColumnOrdinal];
+                            if (columnChange.Value != null && columnChange.Value != DBNull.Value)
                             {
-                                // Delta in Pnl
-                                pnl += (decimal)columnChange.Value - rowPnl;
+                                if (!column.DataType.IsInstanceOfType(columnChange.Value))
+                                {
+                                    columnChange.Value = Convert.ChangeType(columnChange.Value, column.DataType);
+                                }
+                                if (column.ColumnName == "Pnl")
+                                {
+                                    // Delta in Pnl
+                                    pnl += (decimal)columnChange.Value - rowPnl;
+                                }
                             }
-                            dataRow[columnChange.ColumnOrdinal] = columnChange.Value;
+                            dataRow[column] = columnChange.Value;
                         }
                     }
                 }
@@ -141,14 +173,10 @@ namespace PoMo.Client.Views
             this.Pnl = pnl;
         }
 
-        protected abstract Task<DataTable> SubscribeAsync();
-
-        protected abstract Task UnsubscribeAsync();
-
         private void GetData()
         {
             Task.Delay(500) // Wait 1/2 a second to give the app time to flush the dispatcher.
-                .ContinueWith(task => this.SubscribeAsync(), TaskScheduler.Default)
+                .ContinueWith(task => this.SubscribeProjection(this.CreateBusyScope()), TaskScheduler.Default)
                 .Unwrap()
                 .ContinueWith(
                     task => this.Dispatcher.Invoke(new Action<DataTable>(this.OnReceiveDataTable), task.Result),

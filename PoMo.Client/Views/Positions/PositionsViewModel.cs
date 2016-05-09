@@ -21,27 +21,21 @@ namespace PoMo.Client.Views.Positions
             get;
         }
 
+        protected override Func<IDisposable, Task<DataTable>> SubscribeProjection => busyScope => this.ConnectionManager.SubscribeToPortfolioAsync(this.Portfolio.Id, busyScope);
+
+        protected override Func<IDisposable, Task> UnsubscribeProjection => busyScope => this.ConnectionManager.UnsubscribeFromPortfolioAsync(this.Portfolio.Id, busyScope);
+
         public override void Dispose()
         {
             this.ConnectionManager.PortfolioChanged -= this.ConnectionManager_PortfolioChanged;
             base.Dispose();
         }
 
-        protected override Task<DataTable> SubscribeAsync()
-        {
-            return this.ConnectionManager.SubscribeToPortfolioAsync(this.Portfolio.Id, this.CreateBusyScope());
-        }
-
-        protected override Task UnsubscribeAsync()
-        {
-            return this.ConnectionManager.UnsubscribeFromPortfolioAsync(this.Portfolio.Id, this.CreateBusyScope());
-        }
-
         private void ConnectionManager_PortfolioChanged(object sender, PortfolioChangeEventArgs e)
         {
             if (this.IsActive && e.PortfolioId == this.Portfolio.Id)
             {
-                this.Dispatcher.Invoke(DispatcherPriority.Normal, new Action<IReadOnlyCollection<RowChangeBase>>(this.ProcessChanges), e.RowChanges);
+                this.Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action<IReadOnlyCollection<RowChangeBase>>(this.ProcessChanges), e.RowChanges);
             }
         }
     }

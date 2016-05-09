@@ -15,28 +15,22 @@ namespace PoMo.Client.Views.FirmSummary
             this.ConnectionManager.FirmSummaryChanged += this.ConnectionManager_FirmSummaryChanged;
         }
 
-        private void ConnectionManager_FirmSummaryChanged(object sender, ChangeEventArgs e)
-        {
-            if (this.IsActive)
-            {
-                this.Dispatcher.Invoke(DispatcherPriority.Normal, new Action<IReadOnlyCollection<RowChangeBase>>(this.ProcessChanges), e.RowChanges);
-            }
-        }
+        protected override Func<IDisposable, Task<DataTable>> SubscribeProjection => this.ConnectionManager.SubscribeToFirmSummaryAsync;
 
-        protected override Task<DataTable> SubscribeAsync()
-        {
-            return this.ConnectionManager.SubscribeToFirmSummaryAsync(this.CreateBusyScope());
-        }
-
-        protected override Task UnsubscribeAsync()
-        {
-            return this.ConnectionManager.UnsubscribeFromFirmSummaryAsync(this.CreateBusyScope());
-        }
+        protected override Func<IDisposable, Task> UnsubscribeProjection => this.ConnectionManager.UnsubscribeFromFirmSummaryAsync;
 
         public override void Dispose()
         {
             this.ConnectionManager.FirmSummaryChanged -= this.ConnectionManager_FirmSummaryChanged;
             base.Dispose();
+        }
+
+        private void ConnectionManager_FirmSummaryChanged(object sender, ChangeEventArgs e)
+        {
+            if (this.IsActive)
+            {
+                this.Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action<IReadOnlyCollection<RowChangeBase>>(this.ProcessChanges), e.RowChanges);
+            }
         }
     }
 }
