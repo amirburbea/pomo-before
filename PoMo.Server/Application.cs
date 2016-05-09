@@ -2,7 +2,6 @@
 using System.ServiceModel.Channels;
 using System.ServiceModel.Description;
 using PoMo.Common.ServiceModel.Contracts;
-using PoMo.Common.Windsor;
 using PoMo.Server.Properties;
 
 namespace PoMo.Server
@@ -17,18 +16,18 @@ namespace PoMo.Server
     public sealed class Application : IApplication
     {
         private readonly Binding _binding;
-        private readonly IFactory<IServerContract> _serviceFactory;
+        private readonly IServerContract _instance;
         private ServiceHost _host;
 
-        public Application(IFactory<IServerContract> serviceFactory, Binding binding)
+        public Application(IServerContract instance, Binding binding)
         {
-            this._serviceFactory = serviceFactory;
+            this._instance = instance;
             this._binding = binding;
         }
 
         void IApplication.Start()
         {
-            this._host = new ServiceHost(this._serviceFactory.Create());
+            this._host = new ServiceHost(this._instance);
             this._host.AddServiceEndpoint(typeof(IServerContract), this._binding, Settings.Default.WcfUri);
             this._host.Description.Behaviors.Find<ServiceDebugBehavior>().IncludeExceptionDetailInFaults = true;
             this._host.Open();
@@ -37,7 +36,6 @@ namespace PoMo.Server
         void IApplication.Stop()
         {
             this._host.Close();
-            this._serviceFactory.Release((IServerContract)this._host.SingletonInstance);
         }
     }
 }
