@@ -165,17 +165,6 @@ namespace PoMo.Server
             position.Pnl = position.MarkToMarket - position.CostBasis + position.Cash;
         }
 
-        private static DataTable CreateDataSchemaTable()
-        {
-            DataTable dataTable = new DataTable();
-            foreach (PropertyInfo property in typeof(Position).GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(property => property.GetMethod.GetParameters().Length == 0))
-            {
-                dataTable.Columns.Add(new DataColumn(property.Name, Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType));
-            }
-            dataTable.PrimaryKey = new[] { dataTable.Columns[nameof(Position.Ticker)] };
-            return dataTable;
-        }
-
         private static void ProcessTrade(Position position, int quantity, decimal price)
         {
             if (quantity == 0)
