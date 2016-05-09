@@ -3,7 +3,6 @@ using System.IO;
 using System.Reflection;
 using Castle.Windsor;
 using Castle.Windsor.Installer;
-using PoMo.Common.Windsor;
 using PoMo.Data;
 using Topshelf;
 using Topshelf.HostConfigurators;
@@ -25,7 +24,6 @@ namespace PoMo.Server
             {
                 using (IWindsorContainer container = new WindsorContainer())
                 {
-                    FactoryMethods.RegisterFactories(container);
                     container.Install(FromAssembly.InThisApplication());
                     HostFactory.Run(Program.TopshelfConfiguration(container));
                 }
