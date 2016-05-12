@@ -27,15 +27,15 @@ namespace PoMo.Client
             get;
         }
 
-        Task<PortfolioModel[]> GetPortfoliosAsync(IDisposable busyScope);
+        Task<PortfolioModel[]> GetPortfoliosAsync();
 
-        Task<DataTable> SubscribeToFirmSummaryAsync(IDisposable busyScope);
+        Task<DataTable> SubscribeToFirmSummaryAsync();
 
-        Task<DataTable> SubscribeToPortfolioAsync(string portfolioId, IDisposable busyScope);
+        Task<DataTable> SubscribeToPortfolioAsync(string portfolioId);
 
-        Task UnsubscribeFromFirmSummaryAsync(IDisposable busyScope);
+        Task UnsubscribeFromFirmSummaryAsync();
 
-        Task UnsubscribeFromPortfolioAsync(string portfolioId, IDisposable busyScope);
+        Task UnsubscribeFromPortfolioAsync(string portfolioId);
     }
 
     internal sealed class ConnectionManager : IConnectionManager, IDisposable
@@ -79,7 +79,7 @@ namespace PoMo.Client
 
         private interface IRequest
         {
-            void Run(IServerContract channel);
+            bool Run(IServerContract channel);
         }
 
         public ConnectionStatus ConnectionStatus
@@ -126,29 +126,29 @@ namespace PoMo.Client
             }
         }
 
-        Task<PortfolioModel[]> IConnectionManager.GetPortfoliosAsync(IDisposable busyScope)
+        Task<PortfolioModel[]> IConnectionManager.GetPortfoliosAsync()
         {
-            return this.EnqueueRequest(channel => channel.GetPortfolios(), busyScope);
+            return this.EnqueueRequest(channel => channel.GetPortfolios());
         }
 
-        Task<DataTable> IConnectionManager.SubscribeToFirmSummaryAsync(IDisposable busyScope)
+        Task<DataTable> IConnectionManager.SubscribeToFirmSummaryAsync()
         {
-            return this.EnqueueRequest(channel => channel.SubscribeToFirmSummary(), busyScope);
+            return this.EnqueueRequest(channel => channel.SubscribeToFirmSummary());
         }
 
-        Task<DataTable> IConnectionManager.SubscribeToPortfolioAsync(string portfolioId, IDisposable busyScope)
+        Task<DataTable> IConnectionManager.SubscribeToPortfolioAsync(string portfolioId)
         {
-            return this.EnqueueRequest(channel => channel.SubscribeToPortfolio(portfolioId), busyScope);
+            return this.EnqueueRequest(channel => channel.SubscribeToPortfolio(portfolioId));
         }
 
-        Task IConnectionManager.UnsubscribeFromFirmSummaryAsync(IDisposable busyScope)
+        Task IConnectionManager.UnsubscribeFromFirmSummaryAsync()
         {
-            return this.EnqueueRequest(channel => channel.UnsubscribeFromFirmSummary(), busyScope);
+            return this.EnqueueRequest(channel => channel.UnsubscribeFromFirmSummary());
         }
 
-        Task IConnectionManager.UnsubscribeFromPortfolioAsync(string portfolioId, IDisposable busyScope)
+        Task IConnectionManager.UnsubscribeFromPortfolioAsync(string portfolioId)
         {
-            return this.EnqueueRequest(channel => channel.UnsubscribeFromPortfolio(portfolioId), busyScope);
+            return this.EnqueueRequest(channel => channel.UnsubscribeFromPortfolio(portfolioId));
         }
 
         private void Channel_ClosedOrFaulted(object sender, EventArgs e)
@@ -161,23 +161,22 @@ namespace PoMo.Client
             this._resetEvent.Set();
         }
 
-        private Task EnqueueRequest(Action<IServerContract> action, IDisposable busyScope)
+        private Task EnqueueRequest(Action<IServerContract> action)
         {
             return this.EnqueueRequest(
                 channel =>
                 {
                     action(channel);
                     return default(object);
-                },
-                busyScope
+                }
             );
         }
 
-        private Task<TResult> EnqueueRequest<TResult>(Func<IServerContract, TResult> function, IDisposable busyScope)
+        private Task<TResult> EnqueueRequest<TResult>(Func<IServerContract, TResult> function)
         {
             try
             {
-                Request<TResult> request = new Request<TResult>(function, busyScope);
+                Request<TResult> request = new Request<TResult>(function);
                 this._requests.Enqueue(request);
                 return request.Task;
             }
@@ -243,11 +242,10 @@ namespace PoMo.Client
                     while (!this._isDisposed && this._channel != null && ((ICommunicationObject)this._channel).State == CommunicationState.Opened)
                     {
                         IRequest request;
-                        if (!this._requests.TryDequeue(out request))
+                        if (!this._requests.TryDequeue(out request) || !request.Run(this._channel))
                         {
                             break;
                         }
-                        request.Run(this._channel);
                     }
                 }
                 catch (CommunicationException e)
@@ -261,7 +259,7 @@ namespace PoMo.Client
         {
             if (!this._isDisposed)
             {
-                this.EnqueueRequest(channel => channel.Heartbeat(), null);
+                this.EnqueueRequest(channel => channel.Heartbeat());
             }
         }
 
@@ -282,8 +280,7 @@ namespace PoMo.Client
             public void OnFirmSummaryChanged(RowChangeBase[] changes)
             {
                 Task.Factory.StartNew(
-                    arg => this._connectionManager.OnFirmSummaryChanged((RowChangeBase[])arg),
-                    changes,
+                    () => this._connectionManager.OnFirmSummaryChanged(changes),
                     CancellationToken.None,
                     TaskCreationOptions.None,
                     TaskScheduler.Default
@@ -303,32 +300,28 @@ namespace PoMo.Client
 
         private sealed class Request<TResult> : IRequest
         {
-            private readonly IDisposable _busyScope;
             private readonly Func<IServerContract, TResult> _function;
             private readonly TaskCompletionSource<TResult> _taskCompletionSource;
 
-            public Request(Func<IServerContract, TResult> function, IDisposable busyScope)
+            public Request(Func<IServerContract, TResult> function)
             {
                 this._taskCompletionSource = new TaskCompletionSource<TResult>();
                 this._function = function;
-                this._busyScope = busyScope;
             }
 
             public Task<TResult> Task => this._taskCompletionSource.Task;
 
-            public void Run(IServerContract channel)
+            public bool Run(IServerContract channel)
             {
                 try
                 {
                     this._taskCompletionSource.TrySetResult(this._function(channel));
+                    return true;
                 }
                 catch (Exception e)
                 {
                     this._taskCompletionSource.TrySetException(e);
-                }
-                finally
-                {
-                    this._busyScope?.Dispose();
+                    return false;
                 }
             }
         }

@@ -21,9 +21,9 @@ namespace PoMo.Client.Views.Positions
             get;
         }
 
-        protected override Func<IDisposable, Task<DataTable>> SubscribeProjection => busyScope => this.ConnectionManager.SubscribeToPortfolioAsync(this.Portfolio.Id, busyScope);
+        protected override Func<Task<DataTable>> SubscribeProjection => () => this.ConnectionManager.SubscribeToPortfolioAsync(this.Portfolio.Id);
 
-        protected override Func<IDisposable, Task> UnsubscribeProjection => busyScope => this.ConnectionManager.UnsubscribeFromPortfolioAsync(this.Portfolio.Id, busyScope);
+        protected override Func<Task> UnsubscribeProjection => () => this.ConnectionManager.UnsubscribeFromPortfolioAsync(this.Portfolio.Id);
 
         public override void Dispose()
         {

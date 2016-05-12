@@ -58,7 +58,8 @@ namespace PoMo.Client.Views
                 }
                 else
                 {
-                    this.UnsubscribeProjection(this.CreateBusyScope());
+                    IDisposable busyScope = this.CreateBusyScope();
+                    this.UnsubscribeProjection().ContinueWith(delegate { busyScope.Dispose(); });
                     this._dataTable = null;
                     this.Data = null;
                 }
@@ -77,12 +78,12 @@ namespace PoMo.Client.Views
             }
         }
 
-        protected abstract Func<IDisposable, Task<DataTable>> SubscribeProjection
+        protected abstract Func<Task<DataTable>> SubscribeProjection
         {
             get;
         }
 
-        protected abstract Func<IDisposable, Task> UnsubscribeProjection
+        protected abstract Func<Task> UnsubscribeProjection
         {
             get;
         }
@@ -175,12 +176,21 @@ namespace PoMo.Client.Views
 
         private void GetData()
         {
+            IDisposable busyScope = this.CreateBusyScope();
             Task.Delay(500) // Wait 1/2 a second to give the app time to flush the dispatcher.
-                .ContinueWith(task => this.SubscribeProjection(this.CreateBusyScope()), TaskScheduler.Default)
+                .ContinueWith(task => this.SubscribeProjection(), TaskScheduler.Default)
                 .Unwrap()
                 .ContinueWith(
-                    task => this.Dispatcher.Invoke(new Action<DataTable>(this.OnReceiveDataTable), task.Result),
-                    TaskContinuationOptions.NotOnFaulted
+                    task =>
+                    {
+                        using (busyScope)
+                        {
+                            if (!task.IsFaulted)
+                            {
+                                this.Dispatcher.Invoke(DispatcherPriority.Normal, new Action<DataTable>(this.OnReceiveDataTable), task.Result);
+                            }
+                        }
+                    }
                 );
         }
 

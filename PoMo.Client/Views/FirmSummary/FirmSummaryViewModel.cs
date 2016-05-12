@@ -15,9 +15,9 @@ namespace PoMo.Client.Views.FirmSummary
             this.ConnectionManager.FirmSummaryChanged += this.ConnectionManager_FirmSummaryChanged;
         }
 
-        protected override Func<IDisposable, Task<DataTable>> SubscribeProjection => this.ConnectionManager.SubscribeToFirmSummaryAsync;
+        protected override Func<Task<DataTable>> SubscribeProjection => this.ConnectionManager.SubscribeToFirmSummaryAsync;
 
-        protected override Func<IDisposable, Task> UnsubscribeProjection => this.ConnectionManager.UnsubscribeFromFirmSummaryAsync;
+        protected override Func<Task> UnsubscribeProjection => this.ConnectionManager.UnsubscribeFromFirmSummaryAsync;
 
         public override void Dispose()
         {

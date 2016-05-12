@@ -72,7 +72,7 @@ namespace PoMo.Client.Views
                 {
                     return;
                 }
-                this._disposed = false;
+                this._disposed = true;
                 if (Interlocked.Decrement(ref this._viewModel._busyCounter) == 0)
                 {
                     this._viewModel.Dispatcher.InvokeAsync(this._viewModel.OnIsBusyChanged);

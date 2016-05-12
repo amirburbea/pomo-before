@@ -49,23 +49,28 @@ namespace PoMo.Client.Views.Shell
 
         protected override void OnConnectionStatusChanged()
         {
-            switch (this.ConnectionStatus = this.ConnectionManager.ConnectionStatus)
+            if ((this.ConnectionStatus = this.ConnectionManager.ConnectionStatus) != ConnectionStatus.Connected || this.Portfolios.Count != 0)
             {
-                case ConnectionStatus.Connected:
-                    if (this.Portfolios.Count == 0)
-                    {
-                        this.ConnectionManager.GetPortfoliosAsync(this.CreateBusyScope())
-                            .ContinueWith(
-                                task => this.Dispatcher.Invoke(
-                                    DispatcherPriority.Normal,
-                                    new Action<PortfolioModel[]>(models => Array.ForEach(models, this._portfolios.Add)),
-                                    task.Result
-                                ),
-                                TaskContinuationOptions.NotOnFaulted
-                            );
-                    }
-                    break;
+                return;
             }
+            IDisposable busyScope = this.CreateBusyScope();
+            this.ConnectionManager.GetPortfoliosAsync()
+                .ContinueWith(
+                    task =>
+                    {
+                        using (busyScope)
+                        {
+                            if (!task.IsFaulted)
+                            {
+                                this.Dispatcher.BeginInvoke(
+                                    DispatcherPriority.Normal,
+                                    new Action<PortfolioModel[]>(portfolios => Array.ForEach(portfolios, this._portfolios.Add)),
+                                    task.Result
+                                );
+                            }
+                        }
+                    }
+                );
         }
     }
 }
